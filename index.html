@@ -1,2 +1,128 @@
-<h1>Hello world<h1>
-    <H2>Esta es una prueba de commit</H2>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa Interactivo - OpenStreetMap</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        #map {
+            height: 80vh;
+        }
+        #controls-container {
+            margin: 10px;
+            text-align: center;
+        }
+        #search-input {
+            width: 300px;
+            padding: 8px;
+        }
+        #search-button, #get-coordinates-button {
+            padding: 8px 12px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        #info {
+            margin: 10px auto;
+            width: 90%;
+            max-width: 600px;
+            background: #f8f8f8;
+            border-radius: 8px;
+            padding: 10px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls-container">
+        <input type="text" id="search-input" placeholder="Ingresa una dirección..." />
+        <button id="search-button">Buscar</button>
+        <button id="get-coordinates-button">Obtener Coordenadas y Datos</button>
+    </div>
+    <div id="map"></div>
+    <div id="info"></div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const map = L.map('map').setView([19.432608, -99.133209], 13);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        let marker;
+
+        map.on('click', function(e) {
+            const { lat, lng } = e.latlng;
+            if (marker) map.removeLayer(marker);
+            marker = L.marker([lat, lng]).addTo(map);
+            marker.bindPopup(`Coordenadas:<br>Latitud: ${lat.toFixed(6)}<br>Longitud: ${lng.toFixed(6)}`).openPopup();
+            console.log(`Latitud: ${lat}, Longitud: ${lng}`);
+        });
+
+        document.getElementById('search-button').addEventListener('click', function() {
+            const address = document.getElementById('search-input').value;
+            if (!address) {
+                alert('Por favor, ingresa una dirección.');
+                return;
+            }
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`;
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length === 0) {
+                        alert('No se encontraron resultados para la dirección ingresada.');
+                        return;
+                    }
+                    const { lat, lon } = data[0];
+                    map.setView([lat, lon], 15);
+                    if (marker) map.removeLayer(marker);
+                    marker = L.marker([lat, lon]).addTo(map);
+                    marker.bindPopup(`Coordenadas:<br>Latitud: ${parseFloat(lat).toFixed(6)}<br>Longitud: ${parseFloat(lon).toFixed(6)}`).openPopup();
+                    console.log(`Latitud: ${lat}, Longitud: ${lon}`);
+                })
+                .catch(error => {
+                    console.error('Error al buscar la dirección:', error);
+                    alert('Ocurrió un error al buscar la dirección.');
+                });
+        });
+
+        document.getElementById('get-coordinates-button').addEventListener('click', function() {
+            const infoDiv = document.getElementById('info');
+            infoDiv.textContent = '';
+            if (!marker) {
+                alert('No hay un marcador en el mapa.');
+                return;
+            }
+            const { lat, lng } = marker.getLatLng();
+            // Llamar a la API de Nominatim para reverse geocoding
+            const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    let info = `Coordenadas del marcador:\nLatitud: ${lat.toFixed(6)}\nLongitud: ${lng.toFixed(6)}\n\n`;
+                    if (data.display_name) {
+                        info += `Dirección: ${data.display_name}\n\n`;
+                    }
+                    if (data.address) {
+                        info += 'Detalles de la dirección:\n';
+                        for (const [key, value] of Object.entries(data.address)) {
+                            info += `- ${key}: ${value}\n`;
+                        }
+                    }
+                    infoDiv.textContent = info;
+                    console.log('Datos completos de la posición:', data);
+                })
+                .catch(error => {
+                    infoDiv.textContent = '';
+                    alert('Ocurrió un error al obtener los datos de la posición.');
+                    console.error('Error al obtener datos de la posición:', error);
+                });
+        });
+    </script>
+</body>
+</html>
